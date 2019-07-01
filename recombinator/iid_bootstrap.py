@@ -15,7 +15,7 @@ def _verify_iid_bootstrap_arguments(
                 replications: int,
                 replace: bool,
                 sub_sample_length: tp.Optional[int] = None) -> None:
-    T, k = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
+    T, _ = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
 
     if not sub_sample_length:
         sub_sample_length = T
@@ -46,15 +46,19 @@ def _iid_bootstrap_loop_one_dimensional(
     n = len(x)
 
     # allocate memory for resampled data
-    x_star = np.empty((replications, sub_sample_length), dtype=x.dtype)
+    x_star = np.empty((replications, sub_sample_length),
+                      dtype=x.dtype)
 
     if replace:
+        # randint is faster than choice
         for b in range(replications):
             # generate random integer indices from 0 to n-1
-            u = np.random.randint(low=0, high=n, size=(sub_sample_length,))
+            indices = np.random.randint(low=0,
+                                  high=n,
+                                  size=(sub_sample_length,))
 
             # x-star sample simulation
-            x_star[b, :] = x[u]
+            x_star[b, :] = x[indices]
     else:
         for b in range(replications):
             x_star[b, :] = np.random.choice(x, size=(sub_sample_length,),
@@ -63,7 +67,42 @@ def _iid_bootstrap_loop_one_dimensional(
     return x_star
 
 
-def iid_bootstrap_via_loop_one_dimensional(
+# ToDo: Unify one-dimensional and multi-dimensional bootstrap numba functions
+@numba.njit
+def _iid_bootstrap_loop_multi_dimensional(
+        x: np.ndarray,
+        n: int,
+        k: int,
+        replications: int,
+        sub_sample_length: int,
+        replace: bool) -> np.ndarray:
+    # allocate memory for samples
+    x_star = np.empty((replications, sub_sample_length, k),
+                      dtype=x.dtype)
+
+    if replace:
+        # loop over replications
+        for b in range(replications):
+            # generate random integer indices from 0 to n-1
+            indices = np.random.randint(low=0,
+                                        high=n,
+                                        size=(sub_sample_length,))
+
+            x_star[b, :, :] = x[indices, :]
+    else:
+        # loop over replications
+        for b in range(replications):
+            # generate random integer indices from 0 to n-1
+            indices = np.random.choice(np.arange(n),
+                                       size=(sub_sample_length,),
+                                       replace=replace)
+
+            x_star[b, :, :] = x[indices, :]
+
+    return x_star
+
+
+def _iid_bootstrap_via_loop_one_dimensional(
         x: np.ndarray,
         replications: int,
         sub_sample_length: tp.Optional[int] = None,
@@ -109,37 +148,7 @@ def iid_bootstrap_via_loop_one_dimensional(
     return x_star
 
 
-@numba.njit
-def _iid_bootstrap_loop_multi_dimensional(
-        x: np.ndarray,
-        n: int,
-        k: int,
-        replications: int,
-        sub_sample_length: int,
-        replace: bool) -> np.ndarray:
-    # allocate memory for samples
-    x_star = np.empty((replications, sub_sample_length, k), dtype=x.dtype)
-
-    if replace:
-        # loop over replications
-        for b in range(replications):
-            # generate random integer indices from 0 to n-1
-            u = np.random.randint(low=0, high=n, size=(sub_sample_length,))
-
-            x_star[b, :, :] = x[u, :]
-    else:
-        # loop over replications
-        for b in range(replications):
-            # generate random integer indices from 0 to n-1
-            u = np.random.choice(np.arange(n), size=(sub_sample_length,),
-                                 replace=replace)
-
-            x_star[b, :, :] = x[u, :]
-
-    return x_star
-
-
-def iid_bootstrap_via_loop_multi_dimensional(
+def _iid_bootstrap_via_loop_multi_dimensional(
         x: np.ndarray,
         replications: int,
         sub_sample_length: tp.Optional[int] = None,
@@ -217,13 +226,13 @@ def iid_bootstrap_via_loop(x: np.ndarray,
         sub_sample_length=sub_sample_length)
 
     if k == 1:
-        return iid_bootstrap_via_loop_one_dimensional(
+        return _iid_bootstrap_via_loop_one_dimensional(
                                 x=x,
                                 replications=replications,
                                 sub_sample_length=sub_sample_length)
 
     else:
-        return iid_bootstrap_via_loop_multi_dimensional(
+        return _iid_bootstrap_via_loop_multi_dimensional(
                                 x=x,
                                 replications=replications,
                                 sub_sample_length=sub_sample_length)
@@ -308,10 +317,10 @@ def iid_bootstrap_vectorized(x: np.ndarray,
         sub_sample_length=sub_sample_length)
 
     # generate random integer indices from 0 to n-1
-    u = randint(low=0, high=n, size=(replications, sub_sample_length))
+    indices = randint(low=0, high=n, size=(replications, sub_sample_length))
 
     # grab samples
-    x_star = _grab_sub_samples_from_indices(x, u)
+    x_star = _grab_sub_samples_from_indices(x, indices)
 
     if k == 1:
         assert x_star.shape == (replications, sub_sample_length)
@@ -364,18 +373,16 @@ def iid_bootstrap_with_antithetic_resampling(
     x = num_pack.sort(x)
 
     # generate random integer indices from 0 to n-1
-    u1 = randint(low=0,
-                 high=n,
-                 size=(math.ceil(replications / 2),
-                       sub_sample_length))
-    u2 = n - u1 - 1
-    u = num_pack.vstack((u1, u2[:math.floor(replications / 2), :]))
-    # print(u.shape)
+    indices_1 = randint(low=0,
+                        high=n,
+                        size=(math.ceil(replications / 2),
+                              sub_sample_length))
+    indices_2 = n - indices_1 - 1
+    indices = num_pack.vstack((indices_1,
+                               indices_2[:math.floor(replications / 2), :]))
 
     # grab samples
-    x_star = _grab_sub_samples_from_indices(x, u)
-
-    # print(x_star.shape)
+    x_star = _grab_sub_samples_from_indices(x, indices)
 
     assert x_star.shape == (replications, sub_sample_length)
 
@@ -392,22 +399,23 @@ def _iid_bootstrap(x: np.ndarray,
     n = len(x)
 
     # allocate memory for indices
-    u = np.empty((replications, sub_sample_length), dtype=np.int32)
+    indices = np.empty((replications, sub_sample_length),
+                       dtype=np.int32)
 
     if replace:
         for b in range(replications):
             # generate random integer indices from 0 to n-1
-            u[b, :] = np.random.randint(low=0,
-                                        high=n,
-                                        size=(sub_sample_length,))
+            indices[b, :] = np.random.randint(low=0,
+                                              high=n,
+                                              size=(sub_sample_length,))
 
     else:
         for b in range(replications):
-            u[b, :] = np.random.choice(np.arange(n),
-                                       size=(sub_sample_length,),
-                                       replace=replace)
+            indices[b, :] = np.random.choice(np.arange(n),
+                                             size=(sub_sample_length,),
+                                             replace=replace)
 
-    return u
+    return indices
 
 
 def iid_bootstrap(x: np.ndarray,
@@ -449,20 +457,21 @@ def iid_bootstrap(x: np.ndarray,
     if antithetic:
         x = np.sort(x)
 
-        u1 = _iid_bootstrap(x=x,
-                            replications=math.ceil(replications / 2),
-                            sub_sample_length=sub_sample_length,
-                            replace=replace)
+        indices_1 = _iid_bootstrap(x=x,
+                                   replications=math.ceil(replications / 2),
+                                   sub_sample_length=sub_sample_length,
+                                   replace=replace)
 
-        u2 = n - u1 - 1
-        u = np.vstack((u1, u2[:math.floor(replications / 2), :]))
+        indices_2 = n - indices_1 - 1
+        indices = np.vstack((indices_1,
+                             indices_2[:math.floor(replications / 2), :]))
     else:
-        u = _iid_bootstrap(x=x,
-                           replications=replications,
-                           sub_sample_length=sub_sample_length,
-                           replace=replace)
+        indices = _iid_bootstrap(x=x,
+                                 replications=replications,
+                                 sub_sample_length=sub_sample_length,
+                                 replace=replace)
 
-    x_star = _grab_sub_samples_from_indices(x, u)
+    x_star = _grab_sub_samples_from_indices(x, indices)
 
     if k == 1:
         assert x_star.shape == (replications, sub_sample_length)
@@ -505,11 +514,11 @@ def iid_balanced_bootstrap(x: np.ndarray,
 
     # simulate sub-samples
     if k > 1:
-        u = (permutation(num_pack
-                         .arange(n)
-                         .repeat(replications))
-             .reshape(replications, n))
-        x_star = _grab_sub_samples_from_indices(x, u)
+        indices = (permutation(num_pack
+                               .arange(n)
+                               .repeat(replications))
+                   .reshape(replications, n))
+        x_star = _grab_sub_samples_from_indices(x, indices)
         assert x_star.shape == (replications, n, k)
     else:
         y = num_pack.repeat(x, replications)

@@ -16,7 +16,7 @@ from .utilities import \
 def _stationary_bootstrap_loop(block_length: float,
                                replications: int,
                                sub_sample_length: int,
-                               u: np.ndarray,
+                               indices: np.ndarray,
                                T: int) -> np.ndarray:
     """
     This function implements the inner loop for stationary bootstraps. It is JIT
@@ -26,7 +26,7 @@ def _stationary_bootstrap_loop(block_length: float,
         block_length: the average length of each block in a stationary bootstrap
         replications: the number of (sub-)samples to generate
         sub_sample_length: length of the sub-samples to generate
-        u: an integer Numpy array with shape (replications, sub_sample_length)
+        indices: an integer Numpy array with shape (replications, sub_sample_length)
            containing (random) indices of the the beginning of the first block
            in the first column.
         T: the length of the data series that is sub-sampled
@@ -40,12 +40,12 @@ def _stationary_bootstrap_loop(block_length: float,
         for t in range(1, sub_sample_length):
             if np.random.rand() < 1.0 / block_length:
                 # end current block and randomly pick start index for next block
-                u[b, t] = np.ceil(T * np.random.rand())
+                indices[b, t] = np.ceil(T * np.random.rand())
             else:
                 # continue current block for another time-step
-                u[b, t] = u[b, t - 1] + 1
+                indices[b, t] = indices[b, t - 1] + 1
 
-    return u
+    return indices
 
 
 def stationary_bootstrap(x: np.ndarray,
@@ -77,7 +77,7 @@ def stationary_bootstrap(x: np.ndarray,
         bootstrap_type=BlockBootstrapType.STATIONARY,
         sub_sample_length=sub_sample_length)
 
-    T, k = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
+    T, _ = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
 
     if not sub_sample_length:
         sub_sample_length = T
@@ -90,20 +90,20 @@ def stationary_bootstrap(x: np.ndarray,
         x = np.vstack((x, x))
 
     # allocate array for the indices into the source array
-    u = np.zeros((replications, sub_sample_length), dtype=np.int)
+    indices = np.zeros((replications, sub_sample_length), dtype=np.int)
 
     # randomly initialize the beginning of the first block in each sub-sample
-    u[:, 0] = np.random.randint(T, size=(replications,))
+    indices[:, 0] = np.random.randint(T, size=(replications,))
 
     # Loop over B bootstraps
-    u = _stationary_bootstrap_loop(block_length=block_length,
-                                   replications=replications,
-                                   sub_sample_length=sub_sample_length,
-                                   u=u,
-                                   T=T)
+    indices = _stationary_bootstrap_loop(block_length=block_length,
+                                         replications=replications,
+                                         sub_sample_length=sub_sample_length,
+                                         indices=indices,
+                                         T=T)
 
     # return sub-samples
-    return _grab_sub_samples_from_indices(x, u)
+    return _grab_sub_samples_from_indices(x, indices)
 
 
 # ------------------------------------------------------------------------------
@@ -137,34 +137,57 @@ def _general_block_bootstrap_loop(block_length: int,
     """
     # generate array of indeces into the original time series that describe
     # the composition of the generate sub-samples
-    u = np.zeros((replications, sub_sample_length), dtype=np.int32)
+    indices = np.zeros((replications, sub_sample_length), dtype=np.int32)
 
     # loop over replications bootstraps
     for b in range(replications):
         # generate a random array of block start indices with shape
         # (np.ceil(sub_sample_length/block_length), 1)
-        u_tmp \
+        tmp_indices \
             = np.random.choice(block_start_indices,
                                size=(math.ceil(sub_sample_length
                                                / block_length),
                                      1),
                                replace=replace)
 
+        # ToDo: Move that outside the loop
         # add successive indices to starting indices
-        u_tmp = (u_tmp + successive_indices)
+        tmp_indices = (tmp_indices + successive_indices)
 
         # transform to col vector and and remove excess
-        u[b, :] = u_tmp.reshape((-1,))[:sub_sample_length]
+        indices[b, :] = tmp_indices.reshape((-1,))[:sub_sample_length]
 
-    return u
+    return indices
 
 
-def general_block_bootstrap(x: np.ndarray,
-                            block_length: int,
-                            replications: int,
-                            sub_sample_length: tp.Optional[int] = None,
-                            replace: bool = True,
-                            circular: bool = False) -> np.ndarray:
+def _generate_block_start_indices_and_successive_indices(sample_length: int,
+                                                         block_length: int,
+                                                         circular: bool,
+                                                         successive_3d: bool) \
+        -> tp.Tuple[np.ndarray, np.ndarray]:
+    block_start_indices = list(range(0, sample_length, block_length))
+    if not circular:
+        if max(block_start_indices) + block_length >= sample_length:
+            block_start_indices = block_start_indices[:-1]
+
+    # generate a 1-d array containing the sequence of integers from
+    # 0 to block_length-1 with shape (1, block_length)
+    if successive_3d:
+        successive_indices \
+            = np.arange(block_length, dtype=int).reshape((1, 1, block_length))
+    else:
+        successive_indices \
+            = np.arange(block_length, dtype=int).reshape((1, block_length))
+
+    return np.array(block_start_indices), successive_indices
+
+
+def _general_block_bootstrap(x: np.ndarray,
+                             block_length: int,
+                             replications: int,
+                             sub_sample_length: tp.Optional[int] = None,
+                             replace: bool = True,
+                             circular: bool = False) -> np.ndarray:
     """
     This function creates sub-samples from a data series via block based
     bootstrapping using either the circular or moving block scheme.
@@ -183,12 +206,7 @@ def general_block_bootstrap(x: np.ndarray,
     Returns: a NumPy array with shape (replications, sub_sample_length) of
              bootstrapped sub-samples
     """
-
-    T, k = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
-
-    # if block_length > T:
-    #     raise ValueError(
-    #         'The argument block_length must not exceed the size of the data.')
+    T, _ = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
 
     if not sub_sample_length:
         sub_sample_length = T
@@ -205,35 +223,30 @@ def general_block_bootstrap(x: np.ndarray,
                                       bootstrap_type=bootstrap_type,
                                       sub_sample_length=sub_sample_length)
 
-    # generate a list of block start indices
-    block_start_indices = list(range(0, T, block_length))
+    block_start_indices, successive_indices \
+        = _generate_block_start_indices_and_successive_indices(
+                    sample_length=T,
+                    block_length=block_length,
+                    circular=circular,
+                    successive_3d=False)
 
-    if not circular:
-        if max(block_start_indices) + block_length >= T:
-            block_start_indices.pop()
-    else:
+    if circular:
         # replicate time-series for wrap-around
         if x.ndim == 1:
             x = np.hstack((x, x))
         else:
             x = np.vstack((x, x))
 
-    block_start_indices = np.array(block_start_indices)
-
-    # generate a 1-d array containing the sequence of integers from 0 to m-1
-    # with shape (1, block_length)
-    successive_indices \
-        = np.arange(block_length, dtype=int).reshape((1, block_length))
-
-    u = _general_block_bootstrap_loop(block_length=block_length,
-                                      replications=replications,
-                                      block_start_indices=block_start_indices,
-                                      successive_indices=successive_indices,
-                                      sub_sample_length=sub_sample_length,
-                                      replace=replace)
+    indices \
+        = _general_block_bootstrap_loop(block_length=block_length,
+                                        replications=replications,
+                                        block_start_indices=block_start_indices,
+                                        successive_indices=successive_indices,
+                                        sub_sample_length=sub_sample_length,
+                                        replace=replace)
 
     # return sub-samples
-    return _grab_sub_samples_from_indices(x, u)
+    return _grab_sub_samples_from_indices(x, indices)
 
 
 def moving_block_bootstrap(x: np.ndarray,
@@ -259,12 +272,12 @@ def moving_block_bootstrap(x: np.ndarray,
              bootstrapped sub-samples
     """
 
-    return general_block_bootstrap(x=x,
-                                   block_length=block_length,
-                                   replications=replications,
-                                   sub_sample_length=sub_sample_length,
-                                   replace=replace,
-                                   circular=False)
+    return _general_block_bootstrap(x=x,
+                                    block_length=block_length,
+                                    replications=replications,
+                                    sub_sample_length=sub_sample_length,
+                                    replace=replace,
+                                    circular=False)
 
 
 def circular_block_bootstrap(x: np.ndarray,
@@ -290,12 +303,12 @@ def circular_block_bootstrap(x: np.ndarray,
              bootstrapped sub-samples
     """
 
-    return general_block_bootstrap(x=x,
-                                   block_length=block_length,
-                                   replications=replications,
-                                   sub_sample_length=sub_sample_length,
-                                   replace=replace,
-                                   circular=True)
+    return _general_block_bootstrap(x=x,
+                                    block_length=block_length,
+                                    replications=replications,
+                                    sub_sample_length=sub_sample_length,
+                                    replace=replace,
+                                    circular=True)
 
 
 # ------------------------------------------------------------------------------
@@ -322,7 +335,7 @@ def moving_block_bootstrap_vectorized(
              bootstrapped sub-samples
     """
 
-    T, k = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
+    T, _ = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
 
     if not sub_sample_length:
         sub_sample_length = T
@@ -335,33 +348,31 @@ def moving_block_bootstrap_vectorized(
                     bootstrap_type=BlockBootstrapType.MOVING_BLOCK,
                     sub_sample_length=sub_sample_length)
 
-    # generate a list of block start indices
-    block_start_indices = list(range(0, T, block_length))
-    if max(block_start_indices) + block_length >= T:
-        block_start_indices.pop()
+    block_start_indices, successive_indices \
+        = _generate_block_start_indices_and_successive_indices(
+                    sample_length=T,
+                    block_length=block_length,
+                    circular=False,
+                    successive_3d=True)
 
-    # generate a 1-d array containing the sequence of integers from
-    # 0 to block_length-1 with shape (1, block_length)
-    successive_indices \
-        = np.arange(block_length, dtype=int).reshape((1, 1, block_length))
-
-    # generate a random array of block start indices with shape
-    # (np.ceil(sub_sample_length/block_length), 1)
-    u = np.random.choice(block_start_indices,
-                         size=(math.ceil(sub_sample_length
-                                         / block_length),
-                               replications, 1))
+    # ToDo: Put into a separate function and use above
+    indices = np.random.choice(block_start_indices,
+                               size=(math.ceil(sub_sample_length
+                                               / block_length),
+                                     replications,
+                                     1))
 
     # add successive indices to starting indices
-    u = (u + successive_indices)
+    indices = (indices + successive_indices)
 
     # transform to col vector and and remove excess
-    u = u.reshape((replications, -1))[:, :sub_sample_length]
+    indices = indices.reshape((replications, -1))[:, :sub_sample_length]
 
     # return sub-samples
-    return _grab_sub_samples_from_indices(x, u)
+    return _grab_sub_samples_from_indices(x, indices)
 
 
+# ToDo: Unify Moving Block and Circular Block Bootstrap
 # ------------------------------------------------------------------------------
 # circular block bootstrap - vectorized version
 def circular_block_bootstrap_vectorized(
@@ -385,7 +396,7 @@ def circular_block_bootstrap_vectorized(
     Returns: a NumPy array with shape (replications, sub_sample_length) of
              bootstrapped sub-samples
     """
-    T, k = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
+    T, _ = _verify_shape_of_bootstrap_input_data_and_get_dimensions(x)
 
     if not sub_sample_length:
         sub_sample_length = T
@@ -404,26 +415,25 @@ def circular_block_bootstrap_vectorized(
     else:
         x = np.vstack((x, x))
 
-    # generate a list of block start indices
-    block_start_indices = list(range(T))
-
-    # generate a 1-d array containing the sequence of integers from
-    # 0 to block_length-1 with shape (1, block_length)
-    successive_indices \
-        = np.arange(block_length, dtype=int).reshape((1, 1, block_length))
+    block_start_indices, successive_indices \
+        = _generate_block_start_indices_and_successive_indices(
+                    sample_length=T,
+                    block_length=block_length,
+                    circular=True,
+                    successive_3d=True)
 
     # generate a random array of block start indices with shape
     # (np.ceil(T/block_length), 1)
-    u = np.random.choice(block_start_indices,
-                         size=(math.ceil(sub_sample_length / block_length),
-                               replications,
-                               1))
+    indices = np.random.choice(block_start_indices,
+                               size=(math.ceil(sub_sample_length / block_length),
+                                     replications,
+                                     1))
 
     # add successive indices to starting indices
-    u = (u + successive_indices)
+    indices = (indices + successive_indices)
 
     # transform to col vector and and remove excess
-    u = u.reshape((replications, -1))[:, :sub_sample_length]
+    indices = indices.reshape((replications, -1))[:, :sub_sample_length]
 
     # return sub-samples
-    return _grab_sub_samples_from_indices(x, u)
+    return _grab_sub_samples_from_indices(x, indices)
