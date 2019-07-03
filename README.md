@@ -18,38 +18,38 @@ Recombinator is a Python package for statistical resampling in Python. It provid
 
 
 ## Installation
-<!--
-1.  Install Recombinator via PIP: 
-    <pre>
+### Latest Release
+<pre>
     pip install recombinator
-    </pre>
-    or 
-    <pre>
+</pre>
+or 
+<pre>
     pip3 install recombinator
-    </pre>
-    if not using Anaconda.
-    
-    To get the latest version, clone the repository from github, 
-    open a terminal/command prompt, navigate to the root folder and install via
-    <pre>
+</pre>
+if not using Anaconda.
+
+To get the latest version, clone the repository from github, 
+open a terminal/command prompt, navigate to the root folder and install via
+<pre>
     pip install .
-    </pre>
-    or 
-    <pre>
+</pre>
+or 
+<pre>
     pip3 install . 
-    </pre>
-    if not using Anaconda.
--->
+</pre>
+if not using Anaconda.
+
+### Most Recent Version on GitHub
 1. Clone the github repository via
 
-    <pre>
+<pre>
     git clone https://github.com/InvestmentSystems/recombinator.git
-    </pre>
+</pre>
     
 2. Navigate to the recombinator base directory and run
-    <pre>
+<pre>
     pip install .
-    </pre> 
+</pre> 
     
 ## Getting Started
 Please see the Jupyter notebooks 'notebooks/Block Bootstrap.ipynb' and 'notebooks/IID Bootstrap.ipynb' for examples.
