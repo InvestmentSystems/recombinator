@@ -298,7 +298,8 @@ def iid_bootstrap_vectorized(x: np.ndarray,
         x: (n,) or (n, k) dimensional NumPy array of input data
         replications: the number of samples to generate
         sub_sample_length: the length of the bootstrapped samples to generate
-        randint: a function to generate random integers
+        randint: a numpy.random.randint compatible function to generate random
+                 integers
 
     Returns:
         a (replications, n) or (replications, n, k) dimensional NumPy array
@@ -348,7 +349,8 @@ def iid_bootstrap_with_antithetic_resampling(
         replications: the number of samples to generate
         sub_sample_length: the length of the bootstrapped samples to generate
         num_pack: a module compatible with NumPy (function uses vstack and sort)
-        randint: a function to generate random integers
+        randint: a numpy.random.randint compatible function to generate random
+                 integers
 
     Returns:
         a (replications, n) dimensional NumPy array
