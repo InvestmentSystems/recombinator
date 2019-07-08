@@ -66,7 +66,8 @@ def _tapered_block_bootstrap_internal(block_length: int,
                                       sub_sample_length: int,
                                       T: int,
                                       k: int,
-                                      y: np.ndarray) \
+                                      y: np.ndarray,
+                                      replace: bool = True) \
         -> np.ndarray:
     # compute the number of blocks (k in the original paper)
     number_of_blocks = int(np.ceil(sub_sample_length / block_length))
@@ -80,9 +81,12 @@ def _tapered_block_bootstrap_internal(block_length: int,
     # allocate output array
     y_star = np.zeros((replications, output_length, k), dtype=y.dtype)
 
+    block_start_indices = np.arange(np.int32(T - block_length))
+
     for b in range(replications):
         for m in range(number_of_blocks):
-            u = np.random.randint(0, T - block_length)
+            u = np.random.choice(block_start_indices, replace=replace)
+            # u = np.random.randint(0, T - block_length)
             for j in range(block_length):
                 scaled_weight = scaled_weights[j]
                 unweighted_observation = y[u + j, :]
@@ -96,7 +100,8 @@ def tapered_block_bootstrap(
         x: np.ndarray,
         block_length: int,
         replications: int,
-        sub_sample_length: tp.Optional[int] = None) \
+        sub_sample_length: tp.Optional[int] = None,
+        replace: bool = True) \
         -> np.ndarray:
     """
     This function creates samples from a data series using the tapered block
@@ -109,6 +114,8 @@ def tapered_block_bootstrap(
         block_length: the block length
         replications: the number of bootstrap samples to generate
         sub_sample_length: length of the sub-samples to generate
+        replace: whether to sample the same block more than once in a single
+                 replication
 
     Returns: a NumPy array with shape (replications, int(len(x)/block_length))
              of bootstrapped sub-samples
@@ -125,7 +132,7 @@ def tapered_block_bootstrap(
         x=x,
         block_length=block_length,
         replications=replications,
-        replace=True,
+        replace=replace,
         bootstrap_type=BlockBootstrapType.TAPERED_BLOCK,
         sub_sample_length=sub_sample_length)
 
@@ -153,7 +160,8 @@ def tapered_block_bootstrap(
                 sub_sample_length=sub_sample_length,
                 T=T,
                 k=k,
-                y=y)
+                y=y,
+                replace=replace)
 
     if k == 1:
         y_star = y_star.reshape((replications, output_length))
@@ -171,7 +179,8 @@ def tapered_block_bootstrap_vectorized(
         x: np.ndarray,
         block_length: int,
         replications: int,
-        sub_sample_length: tp.Optional[int] = None) \
+        sub_sample_length: tp.Optional[int] = None,
+        replace: bool = True) \
         -> np.ndarray:
     """
     This function creates samples from a data series using the tapered block
@@ -186,6 +195,8 @@ def tapered_block_bootstrap_vectorized(
         block_length: the block length
         replications: the number of bootstrap samples to generate
         sub_sample_length: length of the sub-samples to generate
+        replace: whether to sample the same block more than once in a single
+                 replication
 
     Returns: a NumPy array with shape (replications, int(len(x)/block_length))
              of bootstrapped sub-samples
@@ -200,7 +211,7 @@ def tapered_block_bootstrap_vectorized(
                 x=x,
                 block_length=block_length,
                 replications=replications,
-                replace=True,
+                replace=replace,
                 bootstrap_type=BlockBootstrapType.TAPERED_BLOCK,
                 sub_sample_length=sub_sample_length)
 
@@ -236,19 +247,20 @@ def tapered_block_bootstrap_vectorized(
 
     # generate a random array of block start indices with shape
     # (np.ceil(T/block_length), 1)
-    u = np.random.choice(T - block_length,
-                         size=(number_of_blocks,
-                               replications,
-                               1))
+    indices = np.random.choice(T - block_length,
+                               size=(number_of_blocks,
+                                     replications,
+                                     1),
+                               replace=replace)
 
     # add successive indices to starting indices
-    u = (u + successive_indices)
+    indices = (indices + successive_indices)
 
     # transform to col vector and and remove excess
-    u = u.reshape((replications, -1))
+    indices = indices.reshape((replications, -1))
 
     # y-star sample simulation
-    y_star = _grab_sub_samples_from_indices(y, u)
+    y_star = _grab_sub_samples_from_indices(y, indices)
     y_star *= replicated_scaled_weights
 
     # cut off observations exceeding the sub-sample length
