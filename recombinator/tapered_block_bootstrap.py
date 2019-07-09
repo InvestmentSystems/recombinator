@@ -6,7 +6,8 @@ from .utilities import \
     _verify_shape_of_bootstrap_input_data_and_get_dimensions, \
     _grab_sub_samples_from_indices, \
     _verify_block_bootstrap_arguments, \
-    BlockBootstrapType
+    BlockBootstrapType, \
+    _generate_block_start_indices_and_successive_indices
 
 
 @numba.njit
@@ -86,7 +87,6 @@ def _tapered_block_bootstrap_internal(block_length: int,
     for b in range(replications):
         for m in range(number_of_blocks):
             u = np.random.choice(block_start_indices, replace=replace)
-            # u = np.random.randint(0, T - block_length)
             for j in range(block_length):
                 scaled_weight = scaled_weights[j]
                 unweighted_observation = y[u + j, :]
@@ -180,7 +180,9 @@ def tapered_block_bootstrap_vectorized(
         block_length: int,
         replications: int,
         sub_sample_length: tp.Optional[int] = None,
-        replace: bool = True) \
+        replace: bool = True,
+        num_pack=np,
+        choice=np.random.choice) \
         -> np.ndarray:
     """
     This function creates samples from a data series using the tapered block
@@ -197,6 +199,8 @@ def tapered_block_bootstrap_vectorized(
         sub_sample_length: length of the sub-samples to generate
         replace: whether to sample the same block more than once in a single
                  replication
+        num_pack: a module compatible with NumPy (function uses vstack and sort)
+        choice: a function compatible with numpy.random.choice
 
     Returns: a NumPy array with shape (replications, int(len(x)/block_length))
              of bootstrapped sub-samples
@@ -220,7 +224,7 @@ def tapered_block_bootstrap_vectorized(
             'The argument block_length must not exceed the size of the data.')
 
     # compute the mean of x
-    x_bar = np.mean(x, axis=0)
+    x_bar = num_pack.mean(x, axis=0)
 
     # demean observations
     y = x - x_bar
@@ -232,26 +236,29 @@ def tapered_block_bootstrap_vectorized(
     number_of_blocks = int(np.ceil(sub_sample_length / block_length))
 
     # replicate scaled weights
-    replicated_scaled_weights = np.tile(scaled_weights,
-                                        number_of_blocks)
+    replicated_scaled_weights = num_pack.tile(num_pack.array(scaled_weights),
+                                              number_of_blocks)
 
     if k == 1:
-        replicated_scaled_weights = replicated_scaled_weights.reshape(1, -1)
+        replicated_scaled_weights = replicated_scaled_weights.reshape((1, -1))
     else:
-        replicated_scaled_weights = replicated_scaled_weights.reshape(1, -1, 1)
+        replicated_scaled_weights \
+            = replicated_scaled_weights.reshape((1, -1, 1))
 
+    block_start_indices = num_pack.array(np.arange(np.int32(T - block_length)))
     # generate a 1-d array containing the sequence of integers from
     # 0 to block_length-1 with shape (1, block_length)
     successive_indices \
-        = np.arange(block_length, dtype=int).reshape((1, 1, block_length))
+        = num_pack.array(np.arange(block_length, dtype=int)
+                         .reshape((1, 1, block_length)))
 
     # generate a random array of block start indices with shape
     # (np.ceil(T/block_length), 1)
-    indices = np.random.choice(T - block_length,
-                               size=(number_of_blocks,
-                                     replications,
-                                     1),
-                               replace=replace)
+    indices = choice(block_start_indices,
+                     size=(number_of_blocks,
+                           replications,
+                           1),
+                     replace=replace)
 
     # add successive indices to starting indices
     indices = (indices + successive_indices)

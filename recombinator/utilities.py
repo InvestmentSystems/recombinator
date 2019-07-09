@@ -244,3 +244,25 @@ def _verify_iid_bootstrap_arguments(
                         replace=replace,
                         bootstrap_type=BlockBootstrapType.MOVING_BLOCK,
                         sub_sample_length=sub_sample_length)
+
+
+def _generate_block_start_indices_and_successive_indices(sample_length: int,
+                                                         block_length: int,
+                                                         circular: bool,
+                                                         successive_3d: bool) \
+        -> tp.Tuple[np.ndarray, np.ndarray]:
+    block_start_indices = list(range(0, sample_length, block_length))
+    if not circular:
+        if max(block_start_indices) + block_length >= sample_length:
+            block_start_indices = block_start_indices[:-1]
+
+    # generate a 1-d array containing the sequence of integers from
+    # 0 to block_length-1 with shape (1, block_length)
+    if successive_3d:
+        successive_indices \
+            = np.arange(block_length, dtype=int).reshape((1, 1, block_length))
+    else:
+        successive_indices \
+            = np.arange(block_length, dtype=int).reshape((1, block_length))
+
+    return np.array(block_start_indices), successive_indices
