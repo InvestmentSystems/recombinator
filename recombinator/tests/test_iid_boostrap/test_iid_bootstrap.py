@@ -1,11 +1,4 @@
-import line_profiler
-import math
-import matplotlib
-import matplotlib.pyplot as plt
-import numba
 import numpy as np
-import pandas as pd
-import pytest
 import typing as tp
 
 
@@ -17,9 +10,7 @@ from recombinator.iid_bootstrap import \
     iid_bootstrap_via_loop, \
     iid_bootstrap_with_antithetic_resampling
 
-
 from recombinator.statistics import \
-    estimate_bias_from_bootstrap, \
     estimate_confidence_interval_from_bootstrap, \
     estimate_standard_error_from_bootstrap
 
@@ -27,12 +18,14 @@ from recombinator.statistics import \
 def _test_iid_bootstrap_generic(bootstrap_function: tp.Callable,
                                 x: np.ndarray,
                                 replications: int):
+    n = len(x)
     percentile = 75
     original_statistic = np.percentile(x, percentile)
 
-    # R = 100000
     x_resampled \
         = bootstrap_function(x, replications=replications)
+
+    assert x_resampled.shape == (replications, n)
 
     resampled_statistic \
         = np.percentile(x_resampled,
