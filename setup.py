@@ -18,11 +18,11 @@ URL = 'https://github.com/michaelnowotny/recombinator'
 EMAIL = 'nowotnym@gmail.com'
 AUTHOR = 'Michael Christoph Nowotny'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = "0.0.2"
+VERSION = "0.0.3"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    "cocos", "dataclasses", "numba", "numpy", "pandas", "scipy", "pytest"
+    "cocos", "numba", "numpy", "pandas", "scipy", "pytest"
 ]
 
 # What packages are optional?

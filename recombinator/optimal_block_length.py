@@ -2,7 +2,7 @@
 # available at http://public.econ.duke.edu/~ap172/opt_block_length_REV_dec07.txt
 
 
-from dataclasses import dataclass
+# from dataclasses import dataclass
 import numpy as np
 import typing as tp
 
@@ -59,8 +59,8 @@ def lam(kk: np.ndarray) -> np.ndarray:
            + 2 * (1.0 - np.abs(kk)) * (np.abs(kk) >= 0.5) * (np.abs(kk) <= 1)
 
 
-@dataclass(frozen=True)
-class OptimalBlockLength:
+# @dataclass(frozen=True)
+class OptimalBlockLength(tp.NamedTuple):
     b_star_sb: float  # optimal block length for stationary bootstrap
     b_star_cb: float  # optimal block length for circular block bootstrap
 
