@@ -19,6 +19,11 @@ from recombinator.statistics import (
     estimate_standard_error_from_bootstrap
 )
 
+from recombinator.tests.rng_link_tools import (
+    numpy_to_numba_rng_link_generic_tester,
+    numba_to_numpy_rng_link_generic_tester
+)
+
 
 def _test_block_bootstrap_generic(
         bootstrap_function: tp.Callable,
@@ -27,7 +32,8 @@ def _test_block_bootstrap_generic(
         replications: int,
         lower_ci_bounds: tp.Tuple[float, float] = (0.35, 0.38),
         upper_ci_bounds: tp.Tuple[float, float] = (0.48, 0.50),
-        bse_bounds: tp.Tuple[float, float] = (0.05, 0.065)):
+        bse_bounds: tp.Tuple[float, float] = (0.05, 0.065),
+        test_rng_link: bool = False):
     T = len(y)
     # original estimate
     ar = AR(y)
@@ -65,6 +71,19 @@ def _test_block_bootstrap_generic(
 
     assert bse_bounds[0] <= bootstrap_standard_error <= bse_bounds[1]
 
+    if test_rng_link:
+        numpy_to_numba_rng_link_generic_tester(
+            x=y,
+            bootstrap_function=bootstrap_function,
+            number_of_boostrap_replications=replications,
+            block_length=block_length)
+
+        numba_to_numpy_rng_link_generic_tester(
+            x=y,
+            bootstrap_function=bootstrap_function,
+            number_of_boostrap_replications=replications,
+            block_length=block_length)
+
 
 def test_moving_block_bootstrap(
         time_series_sample: np.ndarray,
@@ -85,7 +104,8 @@ def test_moving_block_bootstrap(
         replications=number_of_time_series_boostrap_replications,
         lower_ci_bounds=lower_ci_bounds,
         upper_ci_bounds=upper_ci_bounds,
-        bse_bounds=bse_bounds)
+        bse_bounds=bse_bounds,
+        test_rng_link=True)
 
     _test_block_bootstrap_generic(
         bootstrap_function=moving_block_bootstrap_vectorized,
@@ -116,7 +136,8 @@ def test_circular_block_bootstrap(
         replications=number_of_time_series_boostrap_replications,
         lower_ci_bounds=lower_ci_bounds,
         upper_ci_bounds=upper_ci_bounds,
-        bse_bounds=bse_bounds)
+        bse_bounds=bse_bounds,
+        test_rng_link=True)
 
     _test_block_bootstrap_generic(
         bootstrap_function=circular_block_bootstrap_vectorized,
@@ -147,7 +168,8 @@ def test_stationary_bootstrap(
         replications=number_of_time_series_boostrap_replications,
         lower_ci_bounds=lower_ci_bounds,
         upper_ci_bounds=upper_ci_bounds,
-        bse_bounds=bse_bounds)
+        bse_bounds=bse_bounds,
+        test_rng_link=True)
 
 
 def test_tapered_block_bootstrap(
@@ -169,7 +191,8 @@ def test_tapered_block_bootstrap(
         replications=number_of_time_series_boostrap_replications,
         lower_ci_bounds=lower_ci_bounds,
         upper_ci_bounds=upper_ci_bounds,
-        bse_bounds=bse_bounds)
+        bse_bounds=bse_bounds,
+        test_rng_link=True)
 
     _test_block_bootstrap_generic(
         bootstrap_function=tapered_block_bootstrap_vectorized,
