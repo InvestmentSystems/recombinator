@@ -14,9 +14,10 @@ from recombinator.tapered_block_bootstrap import tapered_block_bootstrap
 from recombinator.tapered_block_bootstrap import \
     tapered_block_bootstrap_vectorized
 
-from recombinator.statistics import \
-    estimate_confidence_interval_from_bootstrap, \
+from recombinator.statistics import (
+    estimate_confidence_interval_from_bootstrap,
     estimate_standard_error_from_bootstrap
+)
 
 
 def _test_block_bootstrap_generic(

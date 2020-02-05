@@ -3,15 +3,17 @@ import pandas as pd
 import typing as tp
 
 from .iid_bootstrap import iid_bootstrap
-from .block_bootstrap import \
-    moving_block_bootstrap, \
-    circular_block_bootstrap, \
-    stationary_bootstrap, \
+from .block_bootstrap import (
+    moving_block_bootstrap,
+    circular_block_bootstrap,
+    stationary_bootstrap,
     BlockBootstrapType
+)
 
-from .tapered_block_bootstrap import \
-    tapered_block_bootstrap, \
+from .tapered_block_bootstrap import (
+    tapered_block_bootstrap,
     tapered_block_bootstrap_vectorized
+)
 
 
 def rolling_window(a, window):

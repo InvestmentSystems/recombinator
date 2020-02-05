@@ -13,7 +13,7 @@ def original_time_series_sample_size() -> int:
 
 
 @pytest.fixture()
-def number_of_iid_boostrap_replications() -> int:
+def number_of_boostrap_replications() -> int:
     return 100000
 
 

@@ -2,12 +2,14 @@ import numba
 import numpy as np
 import typing as tp
 
-from .utilities import \
-    _verify_shape_of_bootstrap_input_data_and_get_dimensions, \
-    _grab_sub_samples_from_indices, \
-    _verify_block_bootstrap_arguments, \
-    BlockBootstrapType, \
+from .numba_rng_tools import rng_link
+from .utilities import (
+    _verify_shape_of_bootstrap_input_data_and_get_dimensions,
+    _grab_sub_samples_from_indices,
+    _verify_block_bootstrap_arguments,
+    BlockBootstrapType,
     _generate_block_start_indices_and_successive_indices
+)
 
 
 @numba.njit
@@ -61,6 +63,7 @@ def compute_weights(block_length: int, c: float = 0.43) \
     return unscaled_weights, scaled_weights
 
 
+@rng_link()
 @numba.njit
 def _tapered_block_bootstrap_internal(block_length: int,
                                       replications: int,
@@ -68,7 +71,8 @@ def _tapered_block_bootstrap_internal(block_length: int,
                                       T: int,
                                       k: int,
                                       y: np.ndarray,
-                                      replace: bool = True) \
+                                      replace: bool,
+                                      link_rngs: bool) \
         -> np.ndarray:
     # compute the number of blocks (k in the original paper)
     number_of_blocks = int(np.ceil(sub_sample_length / block_length))
@@ -101,7 +105,8 @@ def tapered_block_bootstrap(
         block_length: int,
         replications: int,
         sub_sample_length: tp.Optional[int] = None,
-        replace: bool = True) \
+        replace: bool = True,
+        link_rngs: bool = True) \
         -> np.ndarray:
     """
     This function creates samples from a data series using the tapered block
@@ -116,6 +121,8 @@ def tapered_block_bootstrap(
         sub_sample_length: length of the sub-samples to generate
         replace: whether to sample the same block more than once in a single
                  replication
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns: a NumPy array with shape (replications, int(len(x)/block_length))
              of bootstrapped sub-samples
@@ -161,7 +168,8 @@ def tapered_block_bootstrap(
                 T=T,
                 k=k,
                 y=y,
-                replace=replace)
+                replace=replace,
+                link_rngs=link_rngs)
 
     if k == 1:
         y_star = y_star.reshape((replications, output_length))

@@ -3,24 +3,26 @@ import numba
 import numpy as np
 import typing as tp
 
-from recombinator.utilities import \
-    _generate_block_start_indices_and_successive_indices
-
-from .utilities import \
-    _verify_shape_of_bootstrap_input_data_and_get_dimensions, \
-    _grab_sub_samples_from_indices, \
-    _verify_block_bootstrap_arguments, \
+from .numba_rng_tools import rng_link
+from .utilities import (
+    _generate_block_start_indices_and_successive_indices,
+    _verify_shape_of_bootstrap_input_data_and_get_dimensions,
+    _grab_sub_samples_from_indices,
+    _verify_block_bootstrap_arguments,
     BlockBootstrapType
+)
 
 
 # ------------------------------------------------------------------------------
 # stationary bootstrap
+@rng_link()
 @numba.njit
 def _stationary_bootstrap_loop(block_length: float,
                                replications: int,
                                sub_sample_length: int,
                                indices: np.ndarray,
-                               T: int) -> np.ndarray:
+                               T: int,
+                               link_rngs: bool) -> np.ndarray:
     """
     This function implements the inner loop for stationary bootstraps. It is JIT
     compiled via Numba for performance.
@@ -33,6 +35,8 @@ def _stationary_bootstrap_loop(block_length: float,
            containing (random) indices of the the beginning of the first block
            in the first column.
         T: the length of the data series that is sub-sampled
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns: an integer Numpy array with shape (replications, sub_sample_length)
              containing the index into the source data series for each element
@@ -54,7 +58,8 @@ def _stationary_bootstrap_loop(block_length: float,
 def stationary_bootstrap(x: np.ndarray,
                          block_length: float,
                          replications: int,
-                         sub_sample_length: tp.Optional[int] = None) \
+                         sub_sample_length: tp.Optional[int] = None,
+                         link_rngs: bool = True) \
         -> np.ndarray:
     """
     This function creates sub-samples from a data series via stationary
@@ -67,6 +72,8 @@ def stationary_bootstrap(x: np.ndarray,
         block_length: the block length
         replications: the number of (sub-)samples to generate
         sub_sample_length: length of the sub-samples to generate
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns: a NumPy array with shape (replications, sub_sample_length) of
              bootstrapped sub-samples
@@ -103,7 +110,8 @@ def stationary_bootstrap(x: np.ndarray,
                                          replications=replications,
                                          sub_sample_length=sub_sample_length,
                                          indices=indices,
-                                         T=T)
+                                         T=T,
+                                         link_rngs=link_rngs)
 
     # return sub-samples
     return _grab_sub_samples_from_indices(x, indices)
@@ -111,13 +119,15 @@ def stationary_bootstrap(x: np.ndarray,
 
 # ------------------------------------------------------------------------------
 # moving block and circular bootstrap - Numba versions
+@rng_link()
 @numba.njit
 def _general_block_bootstrap_loop(block_length: int,
                                   replications: int,
                                   block_start_indices: np.ndarray,
                                   successive_indices: np.ndarray,
-                                  sub_sample_length: tp.Optional[int] = None,
-                                  replace: bool = True) -> np.ndarray:
+                                  sub_sample_length: tp.Optional[int],
+                                  replace: bool,
+                                  link_rngs: bool) -> np.ndarray:
     """
     This function implements the inner loop for moving block or circular block
     bootstrapping. It is JIT compiled via Numba for performance.
@@ -132,6 +142,8 @@ def _general_block_bootstrap_loop(block_length: int,
         sub_sample_length: length of the sub-samples to generate
         replace: whether to sample the same block more than once in a single
                  replication
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns: an integer Numpy array with shape (replications, sub_sample_length)
              containing the index into the source data series for each element
@@ -168,7 +180,8 @@ def _general_block_bootstrap(x: np.ndarray,
                              replications: int,
                              sub_sample_length: tp.Optional[int] = None,
                              replace: bool = True,
-                             circular: bool = False) -> np.ndarray:
+                             circular: bool = False,
+                             link_rngs: bool = True) -> np.ndarray:
     """
     This function creates sub-samples from a data series via block based
     bootstrapping using either the circular or moving block scheme.
@@ -183,6 +196,8 @@ def _general_block_bootstrap(x: np.ndarray,
         replace: whether to sample the same block more than once in a single
                  replication
         circular: whether to use circular or moving block bootstrapping
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns: a NumPy array with shape (replications, sub_sample_length) of
              bootstrapped sub-samples
@@ -224,7 +239,8 @@ def _general_block_bootstrap(x: np.ndarray,
                                         block_start_indices=block_start_indices,
                                         successive_indices=successive_indices,
                                         sub_sample_length=sub_sample_length,
-                                        replace=replace)
+                                        replace=replace,
+                                        link_rngs=link_rngs)
 
     # return sub-samples
     return _grab_sub_samples_from_indices(x, indices)
@@ -234,7 +250,8 @@ def moving_block_bootstrap(x: np.ndarray,
                            block_length: int,
                            replications: int,
                            sub_sample_length: tp.Optional[int] = None,
-                           replace: bool = True) -> np.ndarray:
+                           replace: bool = True,
+                           link_rngs: bool = True) -> np.ndarray:
     """
     This function creates sub-samples from a data series via moving block
     bootstrapping.
@@ -248,6 +265,8 @@ def moving_block_bootstrap(x: np.ndarray,
         sub_sample_length: length of the sub-samples to generate
         replace: whether to sample the same block more than once in a single
                  replication
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns: a NumPy array with shape (replications, sub_sample_length) of
              bootstrapped sub-samples
@@ -258,14 +277,16 @@ def moving_block_bootstrap(x: np.ndarray,
                                     replications=replications,
                                     sub_sample_length=sub_sample_length,
                                     replace=replace,
-                                    circular=False)
+                                    circular=False,
+                                    link_rngs=link_rngs)
 
 
 def circular_block_bootstrap(x: np.ndarray,
                              block_length: int,
                              replications: int,
                              sub_sample_length: tp.Optional[int] = None,
-                             replace: bool = True) -> np.ndarray:
+                             replace: bool = True,
+                             link_rngs: bool = True) -> np.ndarray:
     """
     This function creates sub-samples from a data series via circular block
     bootstrapping.
@@ -279,6 +300,8 @@ def circular_block_bootstrap(x: np.ndarray,
         sub_sample_length: length of the sub-samples to generate
         replace: whether to sample the same block more than once in a single
                  replication
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns: a NumPy array with shape (replications, sub_sample_length) of
              bootstrapped sub-samples
@@ -289,7 +312,8 @@ def circular_block_bootstrap(x: np.ndarray,
                                     replications=replications,
                                     sub_sample_length=sub_sample_length,
                                     replace=replace,
-                                    circular=True)
+                                    circular=True,
+                                    link_rngs=link_rngs)
 
 
 def _generalized_block_bootstrap_vectorized(

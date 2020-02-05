@@ -1,13 +1,13 @@
 import math
 import numba
 import numpy as np
-from types import ModuleType
 import typing as tp
 
-
-from .utilities import \
-    _verify_shape_of_bootstrap_input_data_and_get_dimensions, \
+from .numba_rng_tools import rng_link
+from .utilities import (
+    _verify_shape_of_bootstrap_input_data_and_get_dimensions,
     _grab_sub_samples_from_indices
+)
 
 
 def _verify_iid_bootstrap_arguments(
@@ -37,12 +37,14 @@ def _verify_iid_bootstrap_arguments(
 # ------------------------------------------------------------------------------
 # Non-Balanced Bootstrap via Numba Loops
 # - Separate Functions for One-Dimensional and Multi-Dimensional Data
+@rng_link()
 @numba.njit
 def _iid_bootstrap_loop_one_dimensional(
         x: np.ndarray,
         replications: int,
         sub_sample_length: int,
-        replace: bool) -> np.ndarray:
+        replace: bool,
+        link_rngs: bool) -> np.ndarray:
     n = len(x)
 
     # allocate memory for resampled data
@@ -68,6 +70,7 @@ def _iid_bootstrap_loop_one_dimensional(
 
 
 # ToDo: Unify one-dimensional and multi-dimensional bootstrap numba functions
+@rng_link()
 @numba.njit
 def _iid_bootstrap_loop_multi_dimensional(
         x: np.ndarray,
@@ -75,7 +78,8 @@ def _iid_bootstrap_loop_multi_dimensional(
         k: int,
         replications: int,
         sub_sample_length: int,
-        replace: bool) -> np.ndarray:
+        replace: bool,
+        link_rngs: bool) -> np.ndarray:
     # allocate memory for samples
     x_star = np.empty((replications, sub_sample_length, k),
                       dtype=x.dtype)
@@ -106,7 +110,8 @@ def _iid_bootstrap_via_loop_one_dimensional(
         x: np.ndarray,
         replications: int,
         sub_sample_length: tp.Optional[int] = None,
-        replace: bool = True) -> np.ndarray:
+        replace: bool = True,
+        link_rngs: bool = True) -> np.ndarray:
     """
     This function performs an i.i.d. non-balanced bootstrap using loops in Numba
     for one-dimensional input data.
@@ -116,6 +121,8 @@ def _iid_bootstrap_via_loop_one_dimensional(
         replications: the number of samples to generate
         sub_sample_length: the length of the bootstrapped samples to generate
         replace: whether to repeat the same observation in a given sub-sample
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns:
         a (replications, n) dimensional NumPy array
@@ -141,7 +148,8 @@ def _iid_bootstrap_via_loop_one_dimensional(
                             x=x,
                             replications=replications,
                             sub_sample_length=sub_sample_length,
-                            replace=replace)
+                            replace=replace,
+                            link_rngs=link_rngs)
 
     assert x_star.shape == (replications, n)
 
@@ -152,7 +160,8 @@ def _iid_bootstrap_via_loop_multi_dimensional(
         x: np.ndarray,
         replications: int,
         sub_sample_length: tp.Optional[int] = None,
-        replace: bool = True) -> np.ndarray:
+        replace: bool = True,
+        link_rngs: bool = True) -> np.ndarray:
     """
     This function performs an i.i.d. non-balanced bootstrap using loops in Numba
     for multi-dimensional input data.
@@ -162,6 +171,8 @@ def _iid_bootstrap_via_loop_multi_dimensional(
         replications: the number of samples to generate
         sub_sample_length: the length of the bootstrapped samples to generate
         replace: whether to repeat the same observation in a given sub-sample
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns:
         a (replications, n, k) dimensional NumPy array
@@ -189,7 +200,8 @@ def _iid_bootstrap_via_loop_multi_dimensional(
                             k=k,
                             replications=replications,
                             sub_sample_length=sub_sample_length,
-                            replace=replace)
+                            replace=replace,
+                            link_rngs=link_rngs)
 
     assert x_star.shape == (replications, sub_sample_length, k)
 
@@ -198,7 +210,8 @@ def _iid_bootstrap_via_loop_multi_dimensional(
 
 def iid_bootstrap_via_loop(x: np.ndarray,
                            replications: int,
-                           sub_sample_length: tp.Optional[int] = None) \
+                           sub_sample_length: tp.Optional[int] = None,
+                           link_rngs: bool = True) \
         -> np.ndarray:
     """
     This function performs an i.i.d. non-balanced bootstrap using loops in
@@ -208,6 +221,8 @@ def iid_bootstrap_via_loop(x: np.ndarray,
         x: (n,) or (n, k) dimensional NumPy array of input data
         replications: the number of samples to generate
         sub_sample_length: the length of the bootstrapped samples to generate
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns:
         a (replications, n) or (replications, n, k) dimensional NumPy array
@@ -229,13 +244,15 @@ def iid_bootstrap_via_loop(x: np.ndarray,
         return _iid_bootstrap_via_loop_one_dimensional(
                                 x=x,
                                 replications=replications,
-                                sub_sample_length=sub_sample_length)
+                                sub_sample_length=sub_sample_length,
+                                link_rngs=link_rngs)
 
     else:
         return _iid_bootstrap_via_loop_multi_dimensional(
                                 x=x,
                                 replications=replications,
-                                sub_sample_length=sub_sample_length)
+                                sub_sample_length=sub_sample_length,
+                                link_rngs=link_rngs)
 
 
 # ------------------------------------------------------------------------------
@@ -393,11 +410,13 @@ def iid_bootstrap_with_antithetic_resampling(
 
 # ------------------------------------------------------------------------------
 # Non-Balanced Bootstrap with Antithetic Resampling - Numba Loop Implementation
+@rng_link()
 @numba.njit
 def _iid_bootstrap(x: np.ndarray,
                    replications: int,
                    sub_sample_length: int,
-                   replace: bool) -> np.ndarray:
+                   replace: bool,
+                   link_rngs: bool) -> np.ndarray:
     n = len(x)
 
     # allocate memory for indices
@@ -424,7 +443,8 @@ def iid_bootstrap(x: np.ndarray,
                   replications: int,
                   sub_sample_length: tp.Optional[int] = None,
                   replace: bool = True,
-                  antithetic: bool = False) -> np.ndarray:
+                  antithetic: bool = False,
+                  link_rngs: bool = True) -> np.ndarray:
     """
     This function performs an i.i.d. non-balanced bootstrap using loops in Numba
     for one-dimensional input data.
@@ -435,6 +455,8 @@ def iid_bootstrap(x: np.ndarray,
         sub_sample_length: the length of the bootstrapped samples to generate
         replace: whether to repeat the same observation in a given sub-sample
         antithetic: whether to use antithetic sampling
+        link_rngs: whether to synchronize the states of Numba's and Numpy's
+                   random number generators
 
     Returns:
         a (replications, n) dimensional NumPy array
@@ -462,7 +484,8 @@ def iid_bootstrap(x: np.ndarray,
         indices_1 = _iid_bootstrap(x=x,
                                    replications=math.ceil(replications / 2),
                                    sub_sample_length=sub_sample_length,
-                                   replace=replace)
+                                   replace=replace,
+                                   link_rngs=link_rngs)
 
         indices_2 = n - indices_1 - 1
         indices = np.vstack((indices_1,
@@ -471,7 +494,8 @@ def iid_bootstrap(x: np.ndarray,
         indices = _iid_bootstrap(x=x,
                                  replications=replications,
                                  sub_sample_length=sub_sample_length,
-                                 replace=replace)
+                                 replace=replace,
+                                 link_rngs=link_rngs)
 
     x_star = _grab_sub_samples_from_indices(x, indices)
 
