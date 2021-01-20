@@ -193,7 +193,8 @@ def _verify_block_bootstrap_arguments_internal(
             'The argument block_length must not exceed the size of the data.')
 
     if sub_sample_length > T:
-        if not replace or stationary_bootstrap:
+        if not replace:
+        # if not replace or stationary_bootstrap:
             raise ValueError(f'The argument '
                              f'sub_sample_length={sub_sample_length} must not '
                              f'exceed the length of the data={T}.')
