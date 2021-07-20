@@ -50,7 +50,7 @@ def _stationary_bootstrap_loop(block_length: float,
                 indices[b, t] = np.ceil(T * np.random.rand())
             else:
                 # continue current block for another time-step
-                indices[b, t] = indices[b, t - 1] + 1
+                indices[b, t] = indices[b, t - 1] + 1 % (2*T)
 
     return indices
 
