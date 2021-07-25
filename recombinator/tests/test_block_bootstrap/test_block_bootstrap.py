@@ -172,6 +172,22 @@ def test_stationary_bootstrap(
         test_rng_link=True)
 
 
+def test_stationary_bootstrap_source_array_dimensions(
+        time_series_sample,
+        original_time_series_sample_size
+):
+    print('time_series_sample.shape')
+    print(time_series_sample.shape)
+
+    bootstrap_result = stationary_bootstrap(
+        time_series_sample,
+        block_length=800,
+        # block_length=10,
+        replications=10000,
+        sub_sample_length=2 * time_series_sample.shape[0]
+    )
+
+
 def test_tapered_block_bootstrap(
         time_series_sample: np.ndarray,
         number_of_time_series_boostrap_replications: int):
