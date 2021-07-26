@@ -42,6 +42,7 @@ def _stationary_bootstrap_loop(block_length: float,
              containing the index into the source data series for each element
              of each sub-sample.
     """
+    limit = 2*T
 
     for b in range(replications):
         for t in range(1, sub_sample_length):
@@ -50,7 +51,12 @@ def _stationary_bootstrap_loop(block_length: float,
                 indices[b, t] = np.ceil(T * np.random.rand())
             else:
                 # continue current block for another time-step
-                indices[b, t] = (indices[b, t - 1] + 1) % (2*T)
+                next_index = indices[b, t - 1] + 1
+
+                if next_index >= limit:
+                    next_index = 0
+
+                indices[b, t] = next_index
 
     return indices
 
