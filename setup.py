@@ -22,7 +22,7 @@ URL = 'https://github.com/michaelnowotny/recombinator'
 EMAIL = 'nowotnym@gmail.com'
 AUTHOR = 'Michael Christoph Nowotny'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = "0.0.5"
+VERSION = "0.0.6"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -127,6 +127,8 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: Implementation :: CPython',
     ],
     # $ setup.py publish support.
