@@ -19,44 +19,45 @@ Recombinator is a Python package for statistical resampling in Python. It provid
 
 ## Installation
 ### Latest Release
-<pre>
+```shell
     pip install recombinator
-</pre>
+```
 or 
-<pre>
+```shell
     pip3 install recombinator
-</pre>
+```
 if not using Anaconda.
 
 To get the latest version, clone the repository from github, 
 open a terminal/command prompt, navigate to the root folder and install via
-<pre>
+```shell
     pip install .
-</pre>
+```
 or 
-<pre>
+```shell
     pip3 install . 
-</pre>
+```
 if not using Anaconda.
 
 ### Most Recent Version on GitHub
 1. Clone the github repository via
 
-<pre>
+```shell
     git clone https://github.com/InvestmentSystems/recombinator.git
-</pre>
+```
     
 2. Navigate to the Recombinator base directory and run
-<pre>
+```shell
     pip install .
-</pre> 
+``` 
     
 ## Getting Started
 Please see the Jupyter notebooks 'notebooks/Block Bootstrap.ipynb' and 'notebooks/IID Bootstrap.ipynb' for more examples.
 
 ### Basic I.I.D. Bootstrap
-Import modules
-<pre>
+Import modules  
+
+```python
 import matplotlib
 import matplotlib.pyplot as plt
 %matplotlib inline
@@ -70,27 +71,28 @@ from recombinator.iid_bootstrap import \
     iid_bootstrap_via_choice, \
     iid_bootstrap_via_loop, \
     iid_bootstrap_with_antithetic_resampling
-</pre>
+```
 
-For illustrative purposes, generate an original dataset of sample size n=100 to resample from.
-<pre>
+For illustrative purposes, generate an original dataset of sample size n=100 to resample from.  
+
+```python
 n=100
 np.random.seed(1)
 x = np.abs(np.random.randn(n))
-</pre>
+```
 
 Estimate the 75th percentile from the original sample
-<pre>
+```python
 percentile = 75
 original_statistic = np.percentile(x, percentile)
 print(original_statistic)
-</pre>
+```
 
 Now generate 100000 new bootstrap samples by drawing from the original sample with replacement.
-<pre>
+```python
 R = 100000
 x_resampled = iid_bootstrap(x, replications=R)
-</pre>
+```
 This produces a 100000 x 100 dimensional NumPy array. Each row is a new sample.
 
 If we instead wanted to resample without replacement, we could draw shorter samples. 
@@ -99,36 +101,36 @@ http://www.stat.umn.edu/geyer/5601/notes/sub.pdf.
 
 In recombinator, subsampling is achieved by using the keyword arguments "sub_sample_length" and "replace". 
 To draw samples of size 50 without replacement we would write
-<pre>
+```python
 x_resampled = iid_bootstrap(x, replications=R, sub_sample_length=50, replace=False)
-</pre>
+```
 
 Let us return to the original example of resampling at the full sample size with replacement.
 We are interested in the sampling distribution of a statistic (in this example the 75th percentile of the distribution).
 Hence, we calculate the statistic on each of the new bootstrap samples:
-<pre>
+```python
 resampled_statistic = np.percentile(x_resampled, percentile, axis=1)
-</pre>
+```
 
 We can use Recombinator to estimate the bootstrap standard error and the 95% 
 confidence interval of the statistic as follows.
-<pre>
+```python
 from recombinator.statistics import \
     estimate_confidence_interval_from_bootstrap, \
     estimate_standard_error_from_bootstrap
-</pre>
+```
 
 Estimate the standard error of the estimate of the 75th percentile via bootstrap:
-<pre>
+```python
 estimate_standard_error_from_bootstrap(bootstrap_estimates=resampled_statistic,
                                        original_estimate=original_statistic)
-</pre>
+```
 
 Estimate the 95% confidence interval of the 75th percentile via bootstrap:
-<pre>
+```python
 estimate_confidence_interval_from_bootstrap(bootstrap_estimates=resampled_statistic, 
                                             confidence_level=95)
-</pre>
+```
  
 Recombinator supports other variations of the standard i.i.d. bootstrap 
 (the balanced and the antithetic bootstrap). Please see the Jupyter notebook on the I.I.D. boostrap for examples.
@@ -141,16 +143,16 @@ Recombinator offers the following block-based approaches to resample temporally 
 * Tapered Block Bootstrap - Paparoditis and Politis (2001)  
 
 Import statsmodels for the estimation of time-series models.
-<pre>
+```python
 from statsmodels.tsa.arima_process import ArmaProcess
 from statsmodels.tsa.ar_model import AR
 import statsmodels.api as sm
 from statsmodels.graphics.tsaplots import plot_acf
-</pre>
+```
 
 
 Generate a sample of length n=1000 from an AR(1) process with autoregressive coefficient 0.5:
-<pre>
+```python
 np.random.seed(1)
 
 # number of time periods
@@ -165,7 +167,7 @@ phi_1 = 0.5
 y[0] = e[0]*np.sqrt(1.0/(1.0-phi_1**2))
 for t in range(1, T):
     y[t]=phi_1*y[t-1] + e[t]
-</pre>
+```
 
 
 #### Optimal Block-Length
@@ -178,40 +180,40 @@ with corrections by Patton, Politis, and White (2007).
 This algorithm produces optimal block-lengths for the circular block bootstrap and the stationary bootstrap for the estimation of the variance of the mean.
   
 Import the optimal block-length selection functionality:
-<pre>
+```python
 from recombinator.optimal_block_length import optimal_block_length
-</pre>
+```
 
 Compute the optimal block length of the sample from the AR(1) process created above:
-<pre>
+```python
 b_star = optimal_block_length(y)
 b_star_sb = b_star[0].b_star_sb
 b_star_cb = math.ceil(b_star[0].b_star_cb)
 print(f'optimal block length for stationary bootstrap = {b_star_sb}')
 print(f'optimal block length for circular bootstrap = {b_star_cb}')
-</pre>
+```
 
 #### Resampling using a Block-Based Bootstrap
 We illustrate the procedure using the circular-block bootstrap.
-<pre>
+```python
 from recombinator.block_bootstrap import circular_block_bootstrap
-</pre>
+```
 
 The true autoregressive coefficient of the process we simulated is 0.5. 
 The estimated coefficient from the simulated time-series is obtained as follows
-<pre>
+```python
 ar = AR(y)
 estimate_from_original_data = ar.fit(maxlag=1)
 print(estimate_from_original_data.params[1])
-</pre>
+```
 
 Statsmodels can produce an estimate of the standard error of the estimate of the autoregressive coefficient resorting to asymptotic theory:
-<pre>
+```python
 print(estimate_from_original_data.bse[1])
-</pre> 
+```
  
 Generate 10000 new time-series by resampling using a circular-block bootstrap
-<pre>
+```python
 # number of replications for bootstraps (number of resampled time-series to generate)
 B = 10000
 
@@ -220,10 +222,10 @@ y_star_cb \
                                block_length=b_star_cb, 
                                replications=B, 
                                replace=True)
-</pre>
+```
 
 Now estimate the AR coefficient on each of the bootstrap samples
-<pre>
+```python
 estimates_from_bootstrap = []
 ar_estimates_from_bootstrap = np.zeros((B, ))
 
@@ -233,14 +235,14 @@ for b in range(B):
     estimate_from_bootstrap = ar_bootstrap.fit(maxlag=1)
     estimates_from_bootstrap.append(estimate_from_bootstrap)
     ar_estimates_from_bootstrap[b] = estimate_from_bootstrap.params[1]
-</pre>
+```
 
 Plot the sampling distribution and compute its mean and median
-<pre>
+```python
 plt.hist(ar_estimates_from_bootstrap, bins=20)
 print(f'mean={np.mean(ar_estimates_from_bootstrap)}')
 print(f'median={np.median(ar_estimates_from_bootstrap)}')
-</pre>
+```
 
 It turns out that the mean and median are below the AR coefficient estimated on the original sample. 
 This is due to the fact that the block bootstrap approach breaks the temporal 
@@ -253,20 +255,20 @@ designed to mitigate artificial structural breaks introduced by the resampling
 procedure at the block-transition points.
 
 Import the function
-<pre>
+```python
 from recombinator.tapered_block_bootstrap import tapered_block_bootstrap
-</pre>
+```
 
 Run the tapered-block bootstrap
-<pre>
+```python
 y_star_tbb \
     = tapered_block_bootstrap(y, 
                               block_length=b_star_cb, 
                               replications=B)
-</pre>
+```
 
 Again estimate the AR coefficient on each of the new bootstrap samples
-<pre>
+```python
 estimates_from_bootstrap = []
 ar_estimates_from_bootstrap = np.zeros((B, ))
 
@@ -276,14 +278,14 @@ for b in range(B):
     estimate_from_bootstrap = ar_bootstrap.fit(maxlag=1)
     estimates_from_bootstrap.append(estimate_from_bootstrap)
     ar_estimates_from_bootstrap[b] = estimate_from_bootstrap.params[1]
-</pre>
+```
 
 ... and plot the sampling distribution
-<pre>
+```python
 plt.hist(ar_estimates_from_bootstrap, bins=20)
 print(f'mean={np.mean(ar_estimates_from_bootstrap)}')
 print(f'median={np.median(ar_estimates_from_bootstrap)}')
-</pre>
+```
 
 The mean and median of the distribution are now much closer to the estimate from the original time series.
 
@@ -304,40 +306,40 @@ available at https://github.com/michaelnowotny/cocos.
 Using Cocos, resampling on the GPU using Recombinator can be performed as follows.
 
 Import the NumPy-like Cocos package. This requires an ArrayFire installation, a compatible GPU, and the installation of Cocos.
-<pre>
+```python
 import cocos.numerics as cn
 from cocos.device import gpu_sync_wrapper, sync
-</pre>
+```
 
 #### I.I.D. Boostrap
 Generate an original sample to work with
-<pre>
+```python
 n = 100
 cn.random.seed(1)
 x_gpu = cn.absolute(cn.random.randn(n))
 plt.hist(x_gpu);
-</pre>
+```
 
 Resample using an i.i.d. boostrap
-<pre>
+```python
 x_resampled_vectorized_gpu \
     = iid_bootstrap_vectorized(x_gpu, 
                                replications=R, 
                                randint=cn.random.randint)
 sync()
-</pre>
+```
 
 In this case, GPU support is achieved by simply specifying an alternative 
 implementation of NumPy's randint function.
 
 #### Block-Based Bootstrap
 Transfer the array created in the time-series example above to the GPU
-<pre>
+```python
 y_gpu = cn.array(y)
-</pre>
+```
 
 Run a circular-block boostrap on the GPU
-<pre>
+```python
 y_star_cb \
     = circular_block_bootstrap_vectorized(y_gpu, 
                                           block_length=b_star_cb, 
@@ -345,10 +347,10 @@ y_star_cb \
                                           replace=True, 
                                           num_pack=cn, 
                                           choice=cn.random.choice)
-</pre>
+```
 
 Estimate the AR coefficient on each of the bootstrap samples
-<pre>
+```python
 estimates_from_bootstrap = []
 ar_estimates_from_bootstrap = np.zeros((len(y_star_cb), ))
 
@@ -358,14 +360,14 @@ for b in range(len(y_star_cb)):
     estimate_from_bootstrap = ar_bootstrap.fit(maxlag=1)
     estimates_from_bootstrap.append(estimate_from_bootstrap)
     ar_estimates_from_bootstrap[b] = estimate_from_bootstrap.params[1]
-</pre>
+```
 
 Plot the empirical sampling distribution and the compute its mean and median
-<pre>
+```python
 plt.hist(ar_estimates_from_bootstrap, bins=20)
 print(f'mean={np.mean(ar_estimates_from_bootstrap)}')
 print(f'median={np.median(ar_estimates_from_bootstrap)}')
-</pre>
+```
 
 For the block-based bootstrap, GPU support requires the specification of a 
 function compatible with NumPy's random.choice as well as a package 
