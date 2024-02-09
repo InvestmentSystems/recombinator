@@ -22,7 +22,7 @@ URL = 'https://github.com/InvestmentSystems/recombinator'
 EMAIL = 'nowotnym@gmail.com'
 AUTHOR = 'Michael Christoph Nowotny'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = "0.0.6.1"
+VERSION = "0.0.6.2"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
