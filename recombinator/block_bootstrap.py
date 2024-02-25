@@ -106,7 +106,7 @@ def stationary_bootstrap(x: np.ndarray,
         x = np.vstack((x, x))
 
     # allocate array for the indices into the source array
-    indices = np.zeros((replications, sub_sample_length), dtype=np.int)
+    indices = np.zeros((replications, sub_sample_length), dtype=int)
 
     # randomly initialize the beginning of the first block in each sub-sample
     indices[:, 0] = np.random.randint(T, size=(replications,))
